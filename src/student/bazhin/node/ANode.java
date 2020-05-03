@@ -17,33 +17,60 @@ public abstract class ANode extends Thread {
     BufferedReader clientIn;
 
     public ANode() {
-        start();
     }
 
     public ANode(InitNode node) {
+        nodeId = node.nodeId;
         database = node.database;
         clientIn = node.clientIn;
         clientOut = node.clientOut;
         nodeSocket = node.nodeSocket;
+        start();
     }
 
     protected void disconnect() {
-        System.out.println("Клиент ушёл");
+        System.out.println("Отключение клиента");
         try {
             clientIn.close();
             clientOut.close();
             nodeSocket.close();
+
         } catch (IOException e) {
-            System.out.println("Ошибка создания потоков обмена данных");
+            System.out.println("Ошибка закрытия потоков обмена данных");
             e.printStackTrace();
         }
     }
 
-    abstract protected PocketData waitPocket();
+    protected PocketData waitPocket() {
+        String line;
+        PocketData pocketData = null;
+        StringBuilder request = new StringBuilder();
 
-    public void sendPocket(PocketData pocket) throws Exception {
+        if (clientIn != null) {
+            try {
+                while (!(line = clientIn.readLine()).equals("")) {
+                    request.append(line);
+                }
+                pocketData = new PocketData().setJson(request.toString());
+            } catch (IOException e) {
+                handleFailConnection("Ошибка передачи пакета!");
+                e.printStackTrace();
+            }
+        }
+
+        return pocketData;
+    }
+
+    public void sendPocket(PocketData pocket) {
         clientOut.println(pocket);
-    };
+    }
 
-    abstract protected void handleFailSending();
+    protected void handleFailConnection(String errMsg) {
+        disconnect();
+        if ((errMsg == null)) {
+            System.out.println("Ошибка!");
+        } else {
+            System.out.println(errMsg);
+        }
+    }
 }

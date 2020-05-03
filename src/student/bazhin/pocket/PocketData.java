@@ -36,15 +36,19 @@ public class PocketData {
     }
 
     public String getNodeId() {
-        return pocket.metaData.get(NODE_ID_MAPKEY);
+        return (pocket.metaData == null) ? "" : pocket.metaData.get(NODE_ID_MAPKEY);
     }
 
-    public void setNodeId(String nodeId) {
+    public PocketData setNodeId(String nodeId) {
+        if (pocket.metaData == null) {
+            pocket.metaData = new HashMap<>();
+        }
         if (pocket.metaData.containsKey(NODE_ID_MAPKEY)) {
             pocket.metaData.replace(NODE_ID_MAPKEY,nodeId);
         } else {
             pocket.metaData.put(NODE_ID_MAPKEY,nodeId);
         }
+        return this;
     }
 
     public PocketData setMetaData(HashMap<String,String> metaData) {

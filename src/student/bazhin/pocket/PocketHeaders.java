@@ -5,11 +5,13 @@ public enum PocketHeaders {
     //Заголовки считывающего узла
     INIT,
     DATA,
-    CLOSE,
     TEST,
 
     //Заголовки узла представления
     CONNECT,
+    CLOSE,
+    NODE,
+    PROJECT,
 
     //Заголовки сервера
     OK,
