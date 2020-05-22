@@ -5,11 +5,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import student.bazhin.Core;
 import student.bazhin.database.BaseModel;
+import student.bazhin.database.FirebirdDatabase;
 import student.bazhin.pocket.PocketData;
 
 import static student.bazhin.pocket.PocketHeaders.OK;
@@ -22,8 +24,18 @@ public class InitNode extends ANode {
         try {
             clientOut = new PrintWriter(nodeSocket.getOutputStream(),true);
             System.out.println("Поток записи создан.");
+
             clientIn = new BufferedReader(new InputStreamReader(nodeSocket.getInputStream()));
             System.out.println("Поток чтения создан.");
+
+            try {
+                String dbName = "E:\\Inst\\NODE_SERVER_DB.FDB";
+                database = new FirebirdDatabase();
+                database.init(dbName);
+                database.connect();
+            } catch (SQLException | ClassNotFoundException e) {
+                e.printStackTrace();
+            }
         } catch (IOException e) {
             System.out.println("Ошибка создания потоков обмена данных");
             e.printStackTrace();
@@ -33,16 +45,12 @@ public class InitNode extends ANode {
 
     public void run() {
         PocketData pocket;
-        String ip = nodeSocket.getInetAddress().toString();
-        String port = String.valueOf(nodeSocket.getPort());
-        String date = new SimpleDateFormat("yyyy.MM.dd HH.mm.ss").format(new Date());
-
         while ((pocket = waitPocket()) != null) {
             nodeId = pocket.getNodeId();
             switch (pocket.getHeader()) {
                 case INIT: {
-                    nodeId = nodeId.equals("") ? BaseModel.addReaderNode(ip, port, date) : BaseModel.updateReaderNode(nodeId, ip, port, date);
-                    if (respondToNode(nodeId)) {
+                    handleNodeId(BaseModel.getNodeType(database,READER_NODE_CODE));
+                    if (respondToNode()) {
                         new ReaderNode(this);
                     } else {
                         handleFailConnection("Ошибка инициализации считывающего узла!");
@@ -50,8 +58,8 @@ public class InitNode extends ANode {
                     return;
                 }
                 case CONNECT: {
-                    nodeId = nodeId.equals("") ? BaseModel.addViewerNode(ip, port, date) : BaseModel.updateViewerNode(nodeId, ip, port, date);
-                    if (respondToNode(nodeId)) {
+                    handleNodeId(BaseModel.getNodeType(database,VIEWER_NODE_CODE));
+                    if (respondToNode()) {
                         Core.pullViewerNode.put(nodeId,new ViewerNode(this));
                     } else {
                         handleFailConnection("Ошибка инициализации узла представления!");
@@ -66,7 +74,14 @@ public class InitNode extends ANode {
         }
     }
 
-    private boolean respondToNode(String nodeId) {
+    protected void handleNodeId(int nodeType) {
+        String ip = nodeSocket.getInetAddress().toString();
+        String port = String.valueOf(nodeSocket.getPort());
+        String date = new SimpleDateFormat("yyyy.MM.dd HH.mm.ss.SSS").format(new Date());
+        nodeId = nodeId.equals("") ? BaseModel.addNode(database,ip,port,date,nodeType) : BaseModel.updateNode(database,CONNECTED_LITERAL,nodeId,ip,port,date,nodeType);
+    }
+
+    private boolean respondToNode() {
         if (!nodeId.equals("")) {
             sendPocket(new PocketData(OK).setNodeId(nodeId));
             return true;

@@ -6,6 +6,7 @@ import student.bazhin.pocket.PocketData;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 import static student.bazhin.helper.Constants.SPROJECT_ID_MAPKEY;
 import static student.bazhin.helper.Constants.SPROJECT_NAME_MAPKEY;
@@ -28,19 +29,18 @@ public class ReaderNode extends ANode {
         while ((pocket = waitPocket()) != null) {
             switch (pocket.getHeader()) {
                 case DATA: {
+                    sendPocket(new PocketData(OK));
                     String sProjectId = pocket.getMetaData().get(SPROJECT_ID_MAPKEY);
                     String sProjectName = pocket.getMetaData().get(SPROJECT_NAME_MAPKEY);
                     if (!sProjectName.equals("") && !sProjectId.equals("")) {
                         sProjects.put(sProjectId,sProjectName);
                     }
                     if (!nodeId.equals("") && !sProjectId.equals("")) {
-                        ArrayList<String> viewerNodes = BaseModel.getUnionViewerNodes(nodeId,sProjectId);
-                        if (viewerNodes != null) {
-                            for (String viewerNodeId : viewerNodes) {
-                                try {
-                                    Core.pullViewerNode.get(viewerNodeId).sendPocket(pocket);
-                                } catch (Exception ignored) {}
-                            }
+                        ArrayList<String> viewerNodes = BaseModel.getUnionViewerNodes(database,nodeId,sProjectId);
+                        for (String viewerNodeId : viewerNodes) {
+                            try {
+                                Core.pullViewerNode.get(viewerNodeId).sendPocket(pocket); //todo возможно будут проблемы извлечения из пула, если нет такого id узла представления
+                            } catch (Exception ignored) {}
                         }
                     }
                     break;
@@ -48,8 +48,7 @@ public class ReaderNode extends ANode {
                 case TEST: {
                     sendPocket(new PocketData(OK));
                     if (sProjects.size() != 0) {
-                        BaseModel.synchronizeSProjects(sProjects);
-                        sProjects.clear();
+                        synchronizeSProjects(sProjects,BaseModel.getSProjects(database,nodeId));
                     }
                     break;
                 }
@@ -57,27 +56,52 @@ public class ReaderNode extends ANode {
         }
     }
 
+    protected void synchronizeSProjects(HashMap<String, String> sProjectsPocket, HashMap<String,String> sProjectsDb) {
+        ArrayList<String> disposalSProjects = new ArrayList<>();
+        HashMap<String,String> missingSProjects = new HashMap<>();
+
+        if (sProjectsPocket.size() > sProjectsDb.size()) {
+            for (Map.Entry<String, String> sProject: sProjectsDb.entrySet()) {
+                String sProjectId = sProject.getKey();
+                if (!sProjectsPocket.containsKey(sProjectId)) {
+                    disposalSProjects.add(sProjectId);
+                } else {
+                    //после удаления идентичных элементов, в коллекции останутся только те элементы, которые принадлежат только этому множеству
+                    sProjectsPocket.remove(sProjectId);
+                }
+            }
+            missingSProjects = sProjectsPocket;
+        } else {
+            for (Map.Entry<String,String> sProject: sProjectsPocket.entrySet()) {
+                String sProjectId = sProject.getKey();
+                String sProjectName = sProject.getValue();
+                if (!sProjectsDb.containsKey(sProjectId)) {
+                    missingSProjects.put(sProjectId,sProjectName);
+                } else {
+                    //после удаления идентичных элементов, в коллекции останутся только те элементы, которые принадлежат только этому множеству
+                    sProjectsDb.remove(sProjectId);
+                }
+            }
+            disposalSProjects = new ArrayList<>(sProjectsDb.keySet());
+        }
+
+        BaseModel.removeSProjects(database,nodeId,disposalSProjects);
+        BaseModel.addSProjects(database,nodeId,missingSProjects);
+        sProjectsPocket.clear();
+    }
+
     @Override
     protected void disconnect() {
-        super.disconnect();
-        ArrayList<String> viewerNodes = BaseModel.getUnionViewerNodes(nodeId);
-        if (viewerNodes != null) {
-            for (String viewerNodeId : viewerNodes) {
-                try {
-                    Core.pullViewerNode.get(viewerNodeId).sendPocket(new PocketData(CLOSE));
-                } catch (Exception ignored) {}
-            }
+        ArrayList<String> viewerNodes = BaseModel.getUnionViewerNodes(database,nodeId,"");
+        for (String viewerNodeId : viewerNodes) {
+            try {
+                Core.pullViewerNode.get(viewerNodeId).sendPocket(new PocketData(CLOSE)); //todo возможно будут проблемы извлечения из пула, если нет такого id узла представления
+            } catch (Exception ignored) {}
         }
-        BaseModel.removeUnionsByReaderNode(nodeId);
-        BaseModel.removeReaderNodeSProjects(nodeId);
-        BaseModel.removeReaderNode(nodeId);
+        //todo логирование в бд
+        BaseModel.removeUnionsByReaderNode(database,nodeId);
+        BaseModel.removeSProjects(database,nodeId,null);
+        BaseModel.updateNode(database,DISCONNECTED_LITERAL,nodeId,"","","",BaseModel.getNodeType(database,READER_NODE_CODE));
+        super.disconnect();
     }
 }
-
-
-//byte[] buffer = Base64.getDecoder().decode(pocketData.getBinaryFrame());
-//File targetFile = new File("C:\\Users\\Fors\\Desktop\\test.jpg");
-//OutputStream outStream = new FileOutputStream(targetFile);
-//outStream.write(buffer);
-//outStream.flush();
-//outStream.close();

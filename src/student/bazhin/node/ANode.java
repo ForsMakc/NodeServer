@@ -1,6 +1,6 @@
 package student.bazhin.node;
 
-import student.bazhin.database.ADataBase;
+import student.bazhin.database.ADatabase;
 import student.bazhin.pocket.PocketData;
 
 import java.io.BufferedReader;
@@ -12,9 +12,14 @@ public abstract class ANode extends Thread {
 
     String nodeId;
     Socket nodeSocket;
-    ADataBase database;
+    ADatabase database;
     PrintWriter clientOut;
     BufferedReader clientIn;
+
+    protected static final String READER_NODE_CODE = "reader";
+    protected static final String VIEWER_NODE_CODE = "viewer";
+    public static final String CONNECTED_LITERAL = "y";
+    public static final String DISCONNECTED_LITERAL = "n";
 
     public ANode() {
     }
@@ -34,7 +39,7 @@ public abstract class ANode extends Thread {
             clientIn.close();
             clientOut.close();
             nodeSocket.close();
-
+            database.release();
         } catch (IOException e) {
             System.out.println("Ошибка закрытия потоков обмена данных");
             e.printStackTrace();
