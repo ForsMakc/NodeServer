@@ -10,8 +10,7 @@ import java.util.Map;
 
 import static student.bazhin.helper.Constants.SPROJECT_ID_MAPKEY;
 import static student.bazhin.helper.Constants.SPROJECT_NAME_MAPKEY;
-import static student.bazhin.pocket.PocketHeaders.CLOSE;
-import static student.bazhin.pocket.PocketHeaders.OK;
+import static student.bazhin.pocket.PocketHeaders.*;
 
 public class ReaderNode extends ANode {
 
@@ -47,9 +46,7 @@ public class ReaderNode extends ANode {
                 }
                 case TEST: {
                     sendPocket(new PocketData(OK));
-                    if (sProjects.size() != 0) {
-                        synchronizeSProjects(sProjects,BaseModel.getSProjects(database,nodeId));
-                    }
+                    synchronizeSProjects(sProjects,BaseModel.getSProjects(database,nodeId));
                     break;
                 }
             }
@@ -85,8 +82,18 @@ public class ReaderNode extends ANode {
             disposalSProjects = new ArrayList<>(sProjectsDb.keySet());
         }
 
-        BaseModel.removeSProjects(database,nodeId,disposalSProjects);
-        BaseModel.addSProjects(database,nodeId,missingSProjects);
+        if (disposalSProjects.size() > 0) {
+            ArrayList<String> viewerNodes = BaseModel.getUnionViewerNodes(database,nodeId,"");
+            for (String viewerNodeId : viewerNodes) {
+                try {
+                    Core.pullViewerNode.get(viewerNodeId).sendPocket(new PocketData(FAIL)); //todo возможно будут проблемы извлечения из пула, если нет такого id узла представления
+                } catch (Exception ignored) {}
+            }
+            BaseModel.removeSProjects(database,nodeId,disposalSProjects);
+        }
+        if (missingSProjects.size() > 0) {
+            BaseModel.addSProjects(database,nodeId,missingSProjects);
+        }
         sProjectsPocket.clear();
     }
 
@@ -95,13 +102,13 @@ public class ReaderNode extends ANode {
         ArrayList<String> viewerNodes = BaseModel.getUnionViewerNodes(database,nodeId,"");
         for (String viewerNodeId : viewerNodes) {
             try {
-                Core.pullViewerNode.get(viewerNodeId).sendPocket(new PocketData(CLOSE)); //todo возможно будут проблемы извлечения из пула, если нет такого id узла представления
+                Core.pullViewerNode.get(viewerNodeId).sendPocket(new PocketData(FAIL)); //todo возможно будут проблемы извлечения из пула, если нет такого id узла представления
             } catch (Exception ignored) {}
         }
         //todo логирование в бд
-        BaseModel.removeUnionsByReaderNode(database,nodeId);
         BaseModel.removeSProjects(database,nodeId,null);
         BaseModel.updateNode(database,DISCONNECTED_LITERAL,nodeId,"","","",BaseModel.getNodeType(database,READER_NODE_CODE));
         super.disconnect();
     }
+
 }

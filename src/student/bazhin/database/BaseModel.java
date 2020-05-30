@@ -2,11 +2,14 @@ package student.bazhin.database;
 
 import student.bazhin.node.ANode;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
 public class BaseModel {
+
+    public static final String DATABASE_NAME = "E:\\Inst\\NODE_SERVER_DB.FDB";
 
     public static int getNodeType(ADatabase db, String typeCode) {
         String sql = "SELECT id_type FROM node_type WHERE type_code = '" + typeCode + "'";
@@ -26,6 +29,11 @@ public class BaseModel {
 
     public static void removeNode(ADatabase db, String nodeId, int nodeType) {
         String sql = "DELETE FROM node WHERE ID_NODE = " + nodeId + " AND type = " + nodeType;
+        db.executeQuery(sql);
+    }
+
+    public static void removeNode(ADatabase db, String nodeId) {
+        String sql = "DELETE FROM node WHERE ID_NODE = " + nodeId;
         db.executeQuery(sql);
     }
 
@@ -79,14 +87,17 @@ public class BaseModel {
     }
 
     public static void removeSProjects(ADatabase db, String readerNodeId, ArrayList<String> sProjectsIds) {
-        String sqlInArray = "";
+        String sqlInArray = "", sqlInArrayNodeUnion = "", sqlInArraySProject = "";
         if ((sProjectsIds != null) && (sProjectsIds.size() > 0)) {
             for (String sProjectId: sProjectsIds) {
                 sqlInArray += (sqlInArray.equals("")) ? sProjectId : ", " + sProjectId;
             }
-            sqlInArray = " AND id_sproject IN (" + sqlInArray + ")";
+            sqlInArrayNodeUnion = " AND sproject IN (" + sqlInArray + ")";
+            sqlInArraySProject = " AND id_sproject IN (" + sqlInArray + ")";
         }
-        String sql = "DELETE FROM sproject WHERE id_reader_node = " + readerNodeId + sqlInArray;
+        String sql = "DELETE FROM node_union WHERE reader_node = " + readerNodeId + sqlInArrayNodeUnion;
+        db.executeQuery(sql);
+        sql = "DELETE FROM sproject WHERE id_reader_node = " + readerNodeId + sqlInArraySProject;
         db.executeQuery(sql);
     }
 
@@ -127,6 +138,22 @@ public class BaseModel {
     public static void removeUnionsByViewerNode(ADatabase db, String viewerNodeId) {
         String sql = "DELETE FROM node_union WHERE viewer_node = " + viewerNodeId;
         db.executeQuery(sql);
+    }
+
+    public static void prepareTables() throws SQLException, ClassNotFoundException {
+        //todo выполнить очистку бд убрать узловые соединения, убрать узлы представления, установить n считывающим узлам
+        ADatabase database = new FirebirdDatabase();
+        database.init(DATABASE_NAME);
+        database.connect();
+        String sql =
+            "EXECUTE BLOCK AS BEGIN " +
+            "DELETE FROM node_union; " +
+            "DELETE FROM sproject; " +
+            "DELETE FROM node WHERE type = " + getNodeType(database,ANode.VIEWER_NODE_CODE) + "; " +
+            "UPDATE node SET is_connect = '" + ANode.DISCONNECTED_LITERAL + "' ; " +
+            "END";
+        database.executeQuery(sql);
+        database.release();
     }
 
 }

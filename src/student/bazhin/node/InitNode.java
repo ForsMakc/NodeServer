@@ -29,9 +29,8 @@ public class InitNode extends ANode {
             System.out.println("Поток чтения создан.");
 
             try {
-                String dbName = "E:\\Inst\\NODE_SERVER_DB.FDB";
                 database = new FirebirdDatabase();
-                database.init(dbName);
+                database.init(BaseModel.DATABASE_NAME);
                 database.connect();
             } catch (SQLException | ClassNotFoundException e) {
                 e.printStackTrace();
@@ -87,6 +86,13 @@ public class InitNode extends ANode {
             return true;
         }
         return false;
+    }
+
+    @Override
+    protected void disconnect() {
+        //todo логирование в бд
+        BaseModel.removeNode(database,nodeId);
+        super.disconnect();
     }
 
 }

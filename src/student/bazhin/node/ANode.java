@@ -16,8 +16,8 @@ public abstract class ANode extends Thread {
     PrintWriter clientOut;
     BufferedReader clientIn;
 
-    protected static final String READER_NODE_CODE = "reader";
-    protected static final String VIEWER_NODE_CODE = "viewer";
+    public static final String READER_NODE_CODE = "reader";
+    public static final String VIEWER_NODE_CODE = "viewer";
     public static final String CONNECTED_LITERAL = "y";
     public static final String DISCONNECTED_LITERAL = "n";
 
@@ -57,7 +57,7 @@ public abstract class ANode extends Thread {
                     request.append(line);
                 }
                 pocketData = new PocketData().setJson(request.toString());
-            } catch (IOException e) {
+            } catch (Exception e) {
                 handleFailConnection("Ошибка передачи пакета!");
                 e.printStackTrace();
             }
@@ -78,4 +78,5 @@ public abstract class ANode extends Thread {
             System.out.println(errMsg);
         }
     }
+
 }
